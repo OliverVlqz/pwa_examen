@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Document</title>
+  </head>
+  <body>
+    <h1>Captura de Foto con Cámara</h1>
+    <button id="openCameraBtn">Abrir Cámara</button>
+    <div
+      id="cameraContainer"
+      style="display: none; margin-top: 20px"
+    >
+      <video
+        id="video"
+        width="320"
+        height="240"
+        autoplay
+      ></video>
+      <br />
+      <button id="takePhotoBtn">Tomar Foto</button>
+    </div>
+    <canvas
+      id="canvas"
+      width="320"
+      height="240"
+      style="display: none"
+    ></canvas>
+         <div id="photoInfoContainer" >    
+        <img id="photo" ></img>
+        <p id="photoInfo"></p>
+          <p>
+      <a id="link-maps" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">
+        Ver en mapa
+      </a>
+    </p>
+
+    </div>
+   
+
+
+    
+  </body>
+  <script>
+    ctx = canvas.getContext('2d')
+    if ("permissions" in navigator && navigator.permissions.query) {
+  navigator.permissions.query({ name: "geolocation" }).then((result) => {
+    permisoSpan.textContent = result.state;
+    result.onchange = () => {
+      permisoSpan.textContent = result.state;
+    };
+  }).catch(() => {
+    permisoSpan.textContent = "no disponible (permissions API)";
+  });
+} else {
+  permisoSpan.textContent = "desconocido (sin Permissions API)";
+}
+// Instalacion del sw
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('./sw.js')
+        .then(() => {
+          console.log('Service Worker registrado con éxito')
+        })
+        .catch((error) => {
+          console.error('Error al registrar el Service Worker:', error)
+        })
+    }
+
+    async function openCamera() {
+      try {
+        // 1. Definición de Restricciones (Constraints)
+        const constraints = {
+          video: {
+            facingMode: { ideal: 'environment' }, // Solicita la cámara trasera
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+          },
+        }
+
+        // 2. Obtener el Stream de Medios
+        stream = await navigator.mediaDevices.getUserMedia(constraints)
+
+        // 3. Asignar el Stream al Elemento <video>
+        video.srcObject = stream
+
+        // 4. Actualización de la UI
+        cameraContainer.style.display = 'block'
+        openCameraBtn.textContent = 'Cámara Abierta'
+        openCameraBtn.disabled = true
+
+        console.log('Cámara abierta exitosamente')
+      } catch (error) {
+        console.error('Error al acceder a la cámara:', error)
+        alert('No se pudo acceder a la cámara. Asegúrate de dar permisos.')
+      }
+    }
+    function takePhoto() {
+      if (!stream) {
+        alert('Primero debes abrir la cámara')
+        return
+      }
+
+      // 1. Dibujar el Frame de Video en el Canvas
+      // El método drawImage() es clave: toma el <video> como fuente.
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      // 2. Conversión a Data URL
+      const imageDataURL = canvas.toDataURL('image/png')
+
+      // 3. (Opcional) Visualización y Depuración
+      console.log(
+        'Foto capturada en base64:',
+        imageDataURL.length,
+        'caracteres'
+      )
+      // Obtener la informacion de la ubicación
+        navigator.geolocation.getCurrentPosition((position) => {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+          const photoInfo = document.getElementById('photoInfo');
+          
+          photoInfo.textContent = `Latitud: ${latitude}, Longitud: ${longitude}`;
+            const linkMaps = document.getElementById('link-maps');
+            linkMaps.href = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            linkMaps.style.display = 'block';
+
+        }, (error) => {
+          console.error('Error al obtener la ubicación:', error);
+        });
+        // Enlazar a un mapa con la ubicación (si se obtuvo)
+    
+        // Mostrar la foto capturada en la página
+        const img = document.createElement('img')
+        img.src = imageDataURL
+        document.body.appendChild(img)
+
+        //Estilos tipo modal para la imagen capturada y información
+      
+
+        
+
+      // 4. Cierre de la Cámara (Para liberar recursos)
+      closeCamera()
+    }
+    function closeCamera() {
+      if (stream) {
+        // Detener todos los tracks del stream (video, audio, etc.)
+        stream.getTracks().forEach((track) => track.stop())
+        stream = null // Limpiar la referencia
+
+        // Limpiar y ocultar UI
+        video.srcObject = null
+        cameraContainer.style.display = 'none'
+
+        // Restaurar el botón 'Abrir Cámara'
+        openCameraBtn.textContent = 'Abrir Cámara'
+        openCameraBtn.disabled = false
+
+        console.log('Cámara cerrada')
+      }
+    }
+    // Event listeners para la interacción del usuario
+    openCameraBtn.addEventListener('click', openCamera)
+    takePhotoBtn.addEventListener('click', takePhoto)
+
+    // Limpiar stream cuando el usuario cierra o navega fuera de la página
+    window.addEventListener('beforeunload', () => {
+      closeCamera()
+    })
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      align-items: center;
+        display: flex;
+        flex-direction: column;
+    justify-content: center;
+    }
+    #cameraContainer {
+      margin-top: 20px;
+    }
+    #photoInfoContainer {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: fit-content;
+    }
+    #photo {
+      display: block;
+      margin-top: 10px;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #000;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: beige;
+    }
+  </style>
+</html>
